@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
-    String, Symbol,
+    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error, Address,
+    BytesN, Env, String, Symbol,
 };
 
 // -----------------------------
@@ -47,14 +47,14 @@ pub struct RentalAgreement {
 
 #[contractclient(name = "RentalAgreementClient")]
 pub trait RentalAgreementContract {
-    fn get_agreement(&self, agreement_id: BytesN<32>) -> RentalAgreement;
+    fn get_agreement(agreement_id: BytesN<32>) -> RentalAgreement;
 }
 
 // -----------------------------
 // BriqToken contract (simple reward token)
 // -----------------------------
 
-#[contracttype]
+#[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum Error {
@@ -64,7 +64,6 @@ pub enum Error {
 
     InvalidAmount = 500,
     InsufficientBalance = 501,
-    CallerNotAllowed = 502,
     AgreementContractNotSet = 503,
 }
 
@@ -92,9 +91,10 @@ pub enum DataKey {
     TotalSupply,
     Balance(Address),
     RewardConfig,
-    EscrowContract,
-    ReviewContract,
     AgreementContract,
+    ClaimFirstPayment(BytesN<32>, Address),
+    ClaimReview(BytesN<32>, Address),
+    ClaimMutual(BytesN<32>),
 }
 
 #[contract]
@@ -143,7 +143,8 @@ impl BriqToken {
         let admin = Self::require_admin(&env);
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
+        env.events()
+            .publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
     }
 
     pub fn unpause(env: Env) {
@@ -191,25 +192,6 @@ impl BriqToken {
             .unwrap()
     }
 
-    pub fn set_reward_callers(env: Env, escrow_contract: Address, review_contract: Address) {
-        Self::check_not_paused(&env);
-
-        let admin = Self::require_admin(&env);
-        admin.require_auth();
-
-        env.storage()
-            .instance()
-            .set(&DataKey::EscrowContract, &escrow_contract);
-        env.storage()
-            .instance()
-            .set(&DataKey::ReviewContract, &review_contract);
-
-        env.events().publish(
-            (Symbol::new(&env, "RewardCallersSet"),),
-            (escrow_contract, review_contract),
-        );
-    }
-
     pub fn set_agreement_contract(env: Env, agreement_contract: Address) {
         Self::check_not_paused(&env);
 
@@ -241,7 +223,10 @@ impl BriqToken {
     }
 
     pub fn total_supply(env: Env) -> i128 {
-        env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0)
     }
 
     pub fn balance_of(env: Env, owner: Address) -> i128 {
@@ -250,10 +235,8 @@ impl BriqToken {
 
     // --- Token actions ---
 
-    pub fn transfer(env: Env, to: Address, amount: i128) {
+    pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
         Self::check_not_paused(&env);
-
-        let from = env.invoker();
         from.require_auth();
 
         Self::do_transfer(&env, &from, &to, amount);
@@ -266,7 +249,8 @@ impl BriqToken {
         admin.require_auth();
 
         Self::do_mint(&env, &to, amount);
-        env.events().publish((Symbol::new(&env, "Mint"),), (to, amount));
+        env.events()
+            .publish((Symbol::new(&env, "Mint"),), (to, amount));
     }
 
     pub fn burn(env: Env, from: Address, amount: i128) {
@@ -276,14 +260,22 @@ impl BriqToken {
         admin.require_auth();
 
         Self::do_burn(&env, &from, amount);
-        env.events().publish((Symbol::new(&env, "Burn"),), (from, amount));
+        env.events()
+            .publish((Symbol::new(&env, "Burn"),), (from, amount));
     }
 
     // --- Rewards (called by other contracts) ---
 
     pub fn reward_first_payment(env: Env, agreement_id: BytesN<32>, tenant: Address) {
         Self::check_not_paused(&env);
-        Self::require_caller(&env, DataKey::EscrowContract);
+
+        // One-claim-per-(agreement, tenant)
+        if env.storage().persistent().has(&DataKey::ClaimFirstPayment(
+            agreement_id.clone(),
+            tenant.clone(),
+        )) {
+            return;
+        }
 
         let cfg = Self::reward_config(&env);
         if cfg.first_payment_reward <= 0 {
@@ -291,6 +283,10 @@ impl BriqToken {
         }
 
         Self::do_mint(&env, &tenant, cfg.first_payment_reward);
+        env.storage().persistent().set(
+            &DataKey::ClaimFirstPayment(agreement_id.clone(), tenant.clone()),
+            &true,
+        );
         env.events().publish(
             (Symbol::new(&env, "RewardIssued"),),
             (
@@ -304,7 +300,14 @@ impl BriqToken {
 
     pub fn reward_review(env: Env, agreement_id: BytesN<32>, reviewer: Address) {
         Self::check_not_paused(&env);
-        Self::require_caller(&env, DataKey::ReviewContract);
+
+        // One-claim-per-(agreement, reviewer)
+        if env.storage().persistent().has(&DataKey::ClaimReview(
+            agreement_id.clone(),
+            reviewer.clone(),
+        )) {
+            return;
+        }
 
         let cfg = Self::reward_config(&env);
         if cfg.review_reward <= 0 {
@@ -312,6 +315,10 @@ impl BriqToken {
         }
 
         Self::do_mint(&env, &reviewer, cfg.review_reward);
+        env.storage().persistent().set(
+            &DataKey::ClaimReview(agreement_id.clone(), reviewer.clone()),
+            &true,
+        );
         env.events().publish(
             (Symbol::new(&env, "RewardIssued"),),
             (
@@ -327,7 +334,15 @@ impl BriqToken {
     // Token contract fetches the agreement and mints bonus to both tenant and landlord.
     pub fn reward_mutual_review(env: Env, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
-        Self::require_caller(&env, DataKey::ReviewContract);
+
+        // One-claim-per-agreement
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::ClaimMutual(agreement_id.clone()))
+        {
+            return;
+        }
 
         let cfg = Self::reward_config(&env);
         if cfg.mutual_review_bonus <= 0 {
@@ -344,6 +359,10 @@ impl BriqToken {
 
         Self::do_mint(&env, &a.tenant, cfg.mutual_review_bonus);
         Self::do_mint(&env, &a.landlord, cfg.mutual_review_bonus);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::ClaimMutual(agreement_id.clone()), &true);
 
         env.events().publish(
             (Symbol::new(&env, "RewardIssued"),),
@@ -387,24 +406,15 @@ impl BriqToken {
             .unwrap_or_else(|| panic_with_error!(env, Error::Unauthorized))
     }
 
-    fn require_caller(env: &Env, key: DataKey) {
-        let allowed: Address = env
-            .storage()
-            .instance()
-            .get(&key)
-            .unwrap_or_else(|| panic_with_error!(env, Error::CallerNotAllowed));
-
-        if env.invoker() != allowed {
-            panic_with_error!(env, Error::CallerNotAllowed);
-        }
-    }
-
     fn metadata(env: &Env) -> Metadata {
         env.storage().instance().get(&DataKey::Metadata).unwrap()
     }
 
     fn reward_config(env: &Env) -> RewardConfig {
-        env.storage().instance().get(&DataKey::RewardConfig).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::RewardConfig)
+            .unwrap()
     }
 
     fn do_transfer(env: &Env, from: &Address, to: &Address, amount: i128) {
@@ -421,8 +431,10 @@ impl BriqToken {
         let to_balance = Self::get_balance(env, to);
         Self::set_balance(env, to, to_balance + amount);
 
-        env.events()
-            .publish((Symbol::new(env, "Transfer"),), (from.clone(), to.clone(), amount));
+        env.events().publish(
+            (Symbol::new(env, "Transfer"),),
+            (from.clone(), to.clone(), amount),
+        );
     }
 
     fn do_mint(env: &Env, to: &Address, amount: i128) {
@@ -433,8 +445,14 @@ impl BriqToken {
         let to_balance = Self::get_balance(env, to);
         Self::set_balance(env, to, to_balance + amount);
 
-        let supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-        env.storage().instance().set(&DataKey::TotalSupply, &(supply + amount));
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(supply + amount));
     }
 
     fn do_burn(env: &Env, from: &Address, amount: i128) {
@@ -448,8 +466,14 @@ impl BriqToken {
         }
 
         Self::set_balance(env, from, from_balance - amount);
-        let supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-        env.storage().instance().set(&DataKey::TotalSupply, &(supply - amount));
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(supply - amount));
     }
 
     fn set_balance(env: &Env, owner: &Address, amount: i128) {
@@ -486,6 +510,9 @@ mod tests {
         let bob = Address::generate(&env);
         client.mint(&alice, &100);
         assert_eq!(client.balance_of(&alice), 100);
-        let _ = bob;
+        // transfer requires "from" now
+        client.transfer(&alice, &bob, &25);
+        assert_eq!(client.balance_of(&alice), 75);
+        assert_eq!(client.balance_of(&bob), 25);
     }
 }

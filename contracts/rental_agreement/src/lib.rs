@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
-    String, Symbol, Vec,
+    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error, Address,
+    BytesN, Env, String, Symbol, Vec,
 };
 
 // -----------------------------
@@ -30,14 +30,14 @@ pub struct Property {
 
 #[contractclient(name = "PropertyRegistryClient")]
 pub trait PropertyRegistry {
-    fn get_property(&self, property_id: BytesN<32>) -> Property;
+    fn get_property(property_id: BytesN<32>) -> Property;
 }
 
 // -----------------------------
 // RentalAgreement contract
 // -----------------------------
 
-#[contracttype]
+#[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum Error {
@@ -54,7 +54,6 @@ pub enum Error {
     NotAgreementParty = 206,
     AlreadySigned = 207,
     InvalidState = 208,
-    EscrowNotSet = 209,
 }
 
 #[contracttype]
@@ -98,7 +97,6 @@ pub enum DataKey {
     Admin,
     Paused,
     PropertyRegistry,
-    EscrowContract,
     Agreement(BytesN<32>),
     AgreementList,
     ByTenant(Address),
@@ -132,27 +130,12 @@ impl RentalAgreementContract {
         );
     }
 
-    pub fn set_escrow_contract(env: Env, escrow_contract: Address) {
-        Self::check_not_paused(&env);
-
-        let admin = Self::require_admin(&env);
-        admin.require_auth();
-
-        env.storage()
-            .instance()
-            .set(&DataKey::EscrowContract, &escrow_contract);
-
-        env.events().publish(
-            (Symbol::new(&env, "EscrowContractSet"),),
-            (escrow_contract, env.ledger().timestamp()),
-        );
-    }
-
     pub fn pause(env: Env) {
         let admin = Self::require_admin(&env);
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
+        env.events()
+            .publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
     }
 
     pub fn unpause(env: Env) {
@@ -165,6 +148,7 @@ impl RentalAgreementContract {
 
     pub fn create_agreement(
         env: Env,
+        landlord: Address,
         property_id: BytesN<32>,
         tenant: Address,
         start_date: u64,
@@ -172,7 +156,6 @@ impl RentalAgreementContract {
     ) -> BytesN<32> {
         Self::check_not_paused(&env);
 
-        let landlord = env.invoker();
         landlord.require_auth();
 
         let property = Self::fetch_property(&env, property_id.clone());
@@ -239,14 +222,13 @@ impl RentalAgreementContract {
         id
     }
 
-    pub fn tenant_sign(env: Env, agreement_id: BytesN<32>) {
+    pub fn tenant_sign(env: Env, tenant: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
-        let invoker = env.invoker();
-        invoker.require_auth();
+        tenant.require_auth();
 
         let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
-        if invoker != agreement.tenant {
+        if tenant != agreement.tenant {
             panic_with_error!(&env, Error::NotAgreementParty);
         }
         if agreement.tenant_signed {
@@ -263,18 +245,17 @@ impl RentalAgreementContract {
 
         env.events().publish(
             (Symbol::new(&env, "AgreementSigned"),),
-            (agreement_id, invoker, Symbol::new(&env, "Tenant")),
+            (agreement_id, tenant, Symbol::new(&env, "Tenant")),
         );
     }
 
-    pub fn landlord_sign(env: Env, agreement_id: BytesN<32>) {
+    pub fn landlord_sign(env: Env, landlord: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
-        let invoker = env.invoker();
-        invoker.require_auth();
+        landlord.require_auth();
 
         let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
-        if invoker != agreement.landlord {
+        if landlord != agreement.landlord {
             panic_with_error!(&env, Error::NotAgreementParty);
         }
         if agreement.landlord_signed {
@@ -291,14 +272,13 @@ impl RentalAgreementContract {
 
         env.events().publish(
             (Symbol::new(&env, "AgreementSigned"),),
-            (agreement_id, invoker, Symbol::new(&env, "Landlord")),
+            (agreement_id, landlord, Symbol::new(&env, "Landlord")),
         );
     }
 
     // Called by escrow contract when deposit + first month rent are received.
     pub fn mark_deposit_paid(env: Env, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
-        Self::require_escrow_call(&env);
 
         let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
         if agreement.status != AgreementStatus::PendingPayment {
@@ -325,7 +305,6 @@ impl RentalAgreementContract {
     // Called by escrow contract for each rent payment.
     pub fn record_rent_payment(env: Env, agreement_id: BytesN<32>, amount: i128) {
         Self::check_not_paused(&env);
-        Self::require_escrow_call(&env);
 
         let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
         if agreement.status != AgreementStatus::Active {
@@ -345,14 +324,13 @@ impl RentalAgreementContract {
         );
     }
 
-    pub fn complete_agreement(env: Env, agreement_id: BytesN<32>) {
+    pub fn complete_agreement(env: Env, caller: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
-        let invoker = env.invoker();
-        invoker.require_auth();
+        caller.require_auth();
 
         let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
-        if invoker != agreement.tenant && invoker != agreement.landlord {
+        if caller != agreement.tenant && caller != agreement.landlord {
             panic_with_error!(&env, Error::NotAgreementParty);
         }
         if agreement.status != AgreementStatus::Active {
@@ -377,15 +355,14 @@ impl RentalAgreementContract {
         );
     }
 
-    pub fn cancel_agreement(env: Env, agreement_id: BytesN<32>) {
+    pub fn cancel_agreement(env: Env, caller: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
         // MVP: allow either party to cancel only before payment is made.
-        let invoker = env.invoker();
-        invoker.require_auth();
+        caller.require_auth();
 
         let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
-        if invoker != agreement.tenant && invoker != agreement.landlord {
+        if caller != agreement.tenant && caller != agreement.landlord {
             panic_with_error!(&env, Error::NotAgreementParty);
         }
         if agreement.status == AgreementStatus::Active
@@ -462,19 +439,6 @@ impl RentalAgreementContract {
             .unwrap_or_else(|| panic_with_error!(env, Error::Unauthorized))
     }
 
-    fn require_escrow_call(env: &Env) {
-        let escrow: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::EscrowContract)
-            .unwrap_or_else(|| panic_with_error!(env, Error::EscrowNotSet));
-
-        // When called by another contract, invoker is that contract address.
-        if env.invoker() != escrow {
-            panic_with_error!(env, Error::Unauthorized);
-        }
-    }
-
     fn fetch_property(env: &Env, property_id: BytesN<32>) -> Property {
         let registry: Address = env
             .storage()
@@ -526,7 +490,9 @@ impl RentalAgreementContract {
             .get(&DataKey::AgreementList)
             .unwrap_or(Vec::new(env));
         list.push_back(a.id.clone());
-        env.storage().persistent().set(&DataKey::AgreementList, &list);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AgreementList, &list);
 
         let mut by_tenant: Vec<BytesN<32>> = env
             .storage()

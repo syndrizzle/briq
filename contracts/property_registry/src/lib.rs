@@ -1,11 +1,11 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, panic_with_error, Address, BytesN, Env, String, Symbol,
-    Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
+    String, Symbol, Vec,
 };
 
-#[contracttype]
+#[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum Error {
@@ -63,7 +63,9 @@ impl PropertyRegistry {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Paused, &false);
-        env.storage().persistent().set(&DataKey::PropertyList, &Vec::<BytesN<32>>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&DataKey::PropertyList, &Vec::<BytesN<32>>::new(&env));
 
         env.events().publish(
             (Symbol::new(&env, "Initialized"),),
@@ -76,7 +78,8 @@ impl PropertyRegistry {
         admin.require_auth();
 
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
+        env.events()
+            .publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
     }
 
     pub fn unpause(env: Env) {
@@ -90,6 +93,7 @@ impl PropertyRegistry {
 
     pub fn create_property(
         env: Env,
+        owner: Address,
         title: String,
         description: String,
         location: String,
@@ -100,8 +104,6 @@ impl PropertyRegistry {
         image_url: String,
     ) -> BytesN<32> {
         Self::check_not_paused(&env);
-
-        let owner = env.invoker();
         owner.require_auth();
 
         Self::validate_property_fields(
@@ -141,7 +143,9 @@ impl PropertyRegistry {
 
         let mut list = Self::property_list(&env);
         list.push_back(id.clone());
-        env.storage().persistent().set(&DataKey::PropertyList, &list);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PropertyList, &list);
 
         let mut owner_list = Self::owner_index(&env, &owner);
         owner_list.push_back(id.clone());
@@ -159,6 +163,7 @@ impl PropertyRegistry {
 
     pub fn update_property(
         env: Env,
+        owner: Address,
         property_id: BytesN<32>,
         title: String,
         description: String,
@@ -172,7 +177,10 @@ impl PropertyRegistry {
         Self::check_not_paused(&env);
 
         let mut property = Self::get_property(env.clone(), property_id.clone());
-        property.owner.require_auth();
+        owner.require_auth();
+        if owner != property.owner {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
 
         Self::validate_property_fields(
             &env,
@@ -205,11 +213,14 @@ impl PropertyRegistry {
         );
     }
 
-    pub fn set_availability(env: Env, property_id: BytesN<32>, is_available: bool) {
+    pub fn set_availability(env: Env, owner: Address, property_id: BytesN<32>, is_available: bool) {
         Self::check_not_paused(&env);
 
         let mut property = Self::get_property(env.clone(), property_id.clone());
-        property.owner.require_auth();
+        owner.require_auth();
+        if owner != property.owner {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
 
         property.is_available = is_available;
         property.updated_at = env.ledger().timestamp();
@@ -224,11 +235,14 @@ impl PropertyRegistry {
         );
     }
 
-    pub fn deactivate_property(env: Env, property_id: BytesN<32>) {
+    pub fn deactivate_property(env: Env, owner: Address, property_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
         let mut property = Self::get_property(env.clone(), property_id.clone());
-        property.owner.require_auth();
+        owner.require_auth();
+        if owner != property.owner {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
 
         property.is_active = false;
         property.is_available = false;
@@ -256,7 +270,11 @@ impl PropertyRegistry {
         let mut out = Vec::<Property>::new(&env);
 
         for id in ids.iter() {
-            if let Some(p) = env.storage().persistent().get::<_, Property>(&DataKey::Property(id)) {
+            if let Some(p) = env
+                .storage()
+                .persistent()
+                .get::<_, Property>(&DataKey::Property(id))
+            {
                 out.push_back(p);
             }
         }
@@ -269,7 +287,11 @@ impl PropertyRegistry {
         let mut out = Vec::<Property>::new(&env);
 
         for id in ids.iter() {
-            if let Some(p) = env.storage().persistent().get::<_, Property>(&DataKey::Property(id)) {
+            if let Some(p) = env
+                .storage()
+                .persistent()
+                .get::<_, Property>(&DataKey::Property(id))
+            {
                 if p.is_active && p.is_available {
                     out.push_back(p);
                 }
@@ -381,6 +403,7 @@ mod tests {
 
         env.mock_all_auths();
         let id = client.create_property(
+            &owner,
             &title,
             &desc,
             &loc,

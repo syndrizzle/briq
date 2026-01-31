@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
-    String, Symbol, Vec,
+    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error, Address,
+    BytesN, Env, String, Symbol, Vec,
 };
 
 // -----------------------------
@@ -47,7 +47,7 @@ pub struct RentalAgreement {
 
 #[contractclient(name = "RentalAgreementClient")]
 pub trait RentalAgreementContract {
-    fn get_agreement(&self, agreement_id: BytesN<32>) -> RentalAgreement;
+    fn get_agreement(agreement_id: BytesN<32>) -> RentalAgreement;
 }
 
 // -----------------------------
@@ -56,15 +56,15 @@ pub trait RentalAgreementContract {
 
 #[contractclient(name = "RewardTokenClient")]
 pub trait RewardToken {
-    fn reward_review(&self, agreement_id: BytesN<32>, reviewer: Address);
-    fn reward_mutual_review(&self, agreement_id: BytesN<32>);
+    fn reward_review(agreement_id: BytesN<32>, reviewer: Address);
+    fn reward_mutual_review(agreement_id: BytesN<32>);
 }
 
 // -----------------------------
 // ReviewSystem contract
 // -----------------------------
 
-#[contracttype]
+#[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum Error {
@@ -157,7 +157,8 @@ impl ReviewSystem {
         let admin = Self::require_admin(&env);
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
+        env.events()
+            .publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
     }
 
     pub fn unpause(env: Env) {
@@ -208,13 +209,13 @@ impl ReviewSystem {
 
     pub fn submit_review(
         env: Env,
+        reviewer: Address,
         agreement_id: BytesN<32>,
         rating: u8,
         review_text: String,
     ) -> BytesN<32> {
         Self::check_not_paused(&env);
 
-        let reviewer = env.invoker();
         reviewer.require_auth();
 
         if rating < 1 || rating > 5 {
@@ -279,9 +280,10 @@ impl ReviewSystem {
         // Index by agreement
         let mut by_agreement = ids;
         by_agreement.push_back(review_id.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::ReviewsByAgreement(agreement_id.clone()), &by_agreement);
+        env.storage().persistent().set(
+            &DataKey::ReviewsByAgreement(agreement_id.clone()),
+            &by_agreement,
+        );
 
         // Index by user (reviewer)
         let mut by_user: Vec<BytesN<32>> = env
@@ -296,7 +298,13 @@ impl ReviewSystem {
 
         env.events().publish(
             (Symbol::new(&env, "ReviewSubmitted"),),
-            (review_id.clone(), agreement_id.clone(), reviewer, reviewee, rating),
+            (
+                review_id.clone(),
+                agreement_id.clone(),
+                reviewer,
+                reviewee,
+                rating,
+            ),
         );
 
         // Rewards (optional)

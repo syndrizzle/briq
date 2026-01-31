@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
-    String, Symbol, Vec,
+    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error, Address,
+    BytesN, Env, Symbol, Vec,
 };
 
 use soroban_sdk::token;
@@ -49,16 +49,16 @@ pub struct RentalAgreement {
 
 #[contractclient(name = "RentalAgreementClient")]
 pub trait RentalAgreementContract {
-    fn get_agreement(&self, agreement_id: BytesN<32>) -> RentalAgreement;
-    fn mark_deposit_paid(&self, agreement_id: BytesN<32>);
-    fn record_rent_payment(&self, agreement_id: BytesN<32>, amount: i128);
+    fn get_agreement(agreement_id: BytesN<32>) -> RentalAgreement;
+    fn mark_deposit_paid(agreement_id: BytesN<32>);
+    fn record_rent_payment(agreement_id: BytesN<32>, amount: i128);
 }
 
 // -----------------------------
 // EscrowManager contract
 // -----------------------------
 
-#[contracttype]
+#[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum Error {
@@ -144,7 +144,12 @@ impl EscrowManager {
 
         env.events().publish(
             (Symbol::new(&env, "Initialized"),),
-            (admin, agreement_contract, xlm_token, env.ledger().timestamp()),
+            (
+                admin,
+                agreement_contract,
+                xlm_token,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
@@ -152,7 +157,8 @@ impl EscrowManager {
         let admin = Self::require_admin(&env);
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
+        env.events()
+            .publish((Symbol::new(&env, "Paused"),), env.ledger().timestamp());
     }
 
     pub fn unpause(env: Env) {
@@ -168,15 +174,14 @@ impl EscrowManager {
     // - Immediately releases first month rent to landlord
     // - Holds security deposit
     // - Notifies rental agreement contract: mark_deposit_paid + record_rent_payment
-    pub fn deposit_security_and_rent(env: Env, agreement_id: BytesN<32>) {
+    pub fn deposit_security_and_rent(env: Env, tenant: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
-        let invoker = env.invoker();
-        invoker.require_auth();
+        tenant.require_auth();
 
         let agreement = Self::fetch_agreement(&env, agreement_id.clone());
 
-        if invoker != agreement.tenant {
+        if tenant != agreement.tenant {
             panic_with_error!(&env, Error::Unauthorized);
         }
         if agreement.status != AgreementStatus::PendingPayment {
@@ -266,11 +271,19 @@ impl EscrowManager {
 
         env.events().publish(
             (Symbol::new(&env, "SecurityDepositReceived"),),
-            (agreement_id.clone(), agreement.tenant.clone(), agreement.security_deposit),
+            (
+                agreement_id.clone(),
+                agreement.tenant.clone(),
+                agreement.security_deposit,
+            ),
         );
         env.events().publish(
             (Symbol::new(&env, "RentReleasedToLandlord"),),
-            (agreement_id.clone(), agreement.landlord.clone(), agreement.monthly_rent),
+            (
+                agreement_id.clone(),
+                agreement.landlord.clone(),
+                agreement.monthly_rent,
+            ),
         );
 
         // Notify agreement contract
@@ -280,14 +293,13 @@ impl EscrowManager {
     }
 
     // Monthly rent payments (manual, no recurring). Tenant pays contract, contract releases to landlord.
-    pub fn pay_rent(env: Env, agreement_id: BytesN<32>) {
+    pub fn pay_rent(env: Env, tenant: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
-        let invoker = env.invoker();
-        invoker.require_auth();
+        tenant.require_auth();
 
         let agreement = Self::fetch_agreement(&env, agreement_id.clone());
-        if invoker != agreement.tenant {
+        if tenant != agreement.tenant {
             panic_with_error!(&env, Error::Unauthorized);
         }
         if agreement.status != AgreementStatus::Active {
@@ -346,14 +358,13 @@ impl EscrowManager {
 
     // Release security deposit back to tenant.
     // MVP: only allowed after agreement is completed.
-    pub fn release_deposit_to_tenant(env: Env, agreement_id: BytesN<32>) {
+    pub fn release_deposit_to_tenant(env: Env, caller: Address, agreement_id: BytesN<32>) {
         Self::check_not_paused(&env);
 
-        let invoker = env.invoker();
-        invoker.require_auth();
+        caller.require_auth();
 
         let agreement = Self::fetch_agreement(&env, agreement_id.clone());
-        if invoker != agreement.tenant && invoker != agreement.landlord {
+        if caller != agreement.tenant && caller != agreement.landlord {
             panic_with_error!(&env, Error::Unauthorized);
         }
         if agreement.status != AgreementStatus::Completed {
@@ -495,8 +506,7 @@ impl EscrowManager {
     }
 
     fn fetch_agreement(env: &Env, agreement_id: BytesN<32>) -> RentalAgreement {
-        Self::agreement_client(env)
-            .get_agreement(&agreement_id)
+        Self::agreement_client(env).get_agreement(&agreement_id)
     }
 
     fn xlm_client(env: &Env) -> token::Client {
@@ -509,15 +519,14 @@ impl EscrowManager {
     }
 
     fn append_payment(env: &Env, rec: PaymentRecord) {
+        let key = rec.agreement_id.clone();
         let mut v: Vec<PaymentRecord> = env
             .storage()
             .persistent()
-            .get(&DataKey::Payments(rec.agreement_id.clone()))
+            .get(&DataKey::Payments(key.clone()))
             .unwrap_or(Vec::<PaymentRecord>::new(env));
         v.push_back(rec);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Payments(rec.agreement_id), &v);
+        env.storage().persistent().set(&DataKey::Payments(key), &v);
     }
 
     fn new_id(env: &Env) -> BytesN<32> {
