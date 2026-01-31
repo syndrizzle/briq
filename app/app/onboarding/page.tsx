@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  WalletIcon,
-  SpinnerIcon,
-  ArrowRightIcon,
-} from "@phosphor-icons/react";
+import { WalletIcon, SpinnerIcon, ArrowRightIcon } from "@phosphor-icons/react";
 import {
   isConnected,
   requestAccess,
@@ -28,6 +24,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<OnboardingStep>("wallet");
   const [isConnecting, setIsConnecting] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isFreighterInstalled, setIsFreighterInstalled] = useState(false);
 
   useEffect(() => {
@@ -49,7 +46,9 @@ export default function OnboardingPage() {
         if (address.address && isTestnet) {
           setStep("choose-side");
         } else if (address.address && !isTestnet) {
-          toast.error("Please switch your Freighter network to Testnet and try again.");
+          toast.error(
+            "Please switch your Freighter network to Testnet and try again.",
+          );
         }
       }
     } catch (err) {
@@ -69,7 +68,9 @@ export default function OnboardingPage() {
           access.error.includes("rejected") ||
           access.error.includes("cancelled")
         ) {
-          toast.error("Connection cancelled. You can try again when you're ready.");
+          toast.error(
+            "Connection cancelled. You can try again when you're ready.",
+          );
         } else {
           toast.error(access.error);
         }
@@ -84,11 +85,25 @@ export default function OnboardingPage() {
           network.networkPassphrase === TESTNET_PASSPHRASE;
 
         if (!isTestnet) {
-          toast.error("Please switch your Freighter network to Testnet and try again.");
+          toast.error(
+            "Please switch your Freighter network to Testnet and try again.",
+          );
           setIsConnecting(false);
           return;
         }
 
+        // Save wallet address to user profile
+        try {
+          await fetch("/api/user/update-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ walletAddress: access.address }),
+          });
+        } catch (err) {
+          console.error("Failed to save wallet address:", err);
+        }
+
+        setWalletAddress(access.address);
         toast.success("Wallet connected successfully!");
         setStep("choose-side");
       }
@@ -100,12 +115,16 @@ export default function OnboardingPage() {
           err.message?.includes("declined") ||
           err.message?.includes("User denied")
         ) {
-          toast.error("Connection cancelled. You can try again when you're ready.");
+          toast.error(
+            "Connection cancelled. You can try again when you're ready.",
+          );
         } else {
           toast.error("Failed to connect wallet. Please try again.");
         }
       } else {
-        toast.error("Connection cancelled. You can try again when you're ready.");
+        toast.error(
+          "Connection cancelled. You can try again when you're ready.",
+        );
       }
       console.error("Error connecting wallet:", err);
     } finally {
@@ -113,12 +132,21 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleChooseSide = (side: "landlord" | "tenant") => {
-    // TODO: Save user choice to database
-    toast.success(`You've chosen to ${side === "landlord" ? "list" : "rent"}!`);
-    setTimeout(() => {
-      router.push("/app");
-    }, 1000);
+  const handleChooseSide = async (side: "landlord" | "tenant") => {
+    try {
+      await fetch("/api/user/update-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userType: side }),
+      });
+      toast.success(
+        `You've chosen to ${side === "landlord" ? "list" : "rent"}!`,
+      );
+      router.push("/app/dashboard");
+    } catch (err) {
+      console.error("Failed to save user type:", err);
+      toast.error("Something went wrong. Please try again.");
+    }
   };
 
   const userName = session?.user?.name || "there";
@@ -193,7 +221,6 @@ export default function OnboardingPage() {
                 </>
               )}
             </Button>
-
           </CardContent>
         </Card>
       </div>
@@ -228,15 +255,10 @@ export default function OnboardingPage() {
                   Connect with verified tenants through our trusted network
                 </li>
                 <li>
-                  Receive secure, instant payments powered by Stellar
-                  blockchain
+                  Receive secure, instant payments powered by Stellar blockchain
                 </li>
-                <li>
-                  Set your own rental terms and pricing with full control
-                </li>
-                <li>
-                  Built-in dispute resolution and transparent agreements
-                </li>
+                <li>Set your own rental terms and pricing with full control</li>
+                <li>Built-in dispute resolution and transparent agreements</li>
                 <li>Earn passive income from your unused space</li>
               </ul>
             </CardHeader>
@@ -269,8 +291,7 @@ export default function OnboardingPage() {
                   Browse verified listings with transparent pricing and photos
                 </li>
                 <li>
-                  Secure your booking with blockchain-backed payment
-                  protection
+                  Secure your booking with blockchain-backed payment protection
                 </li>
                 <li>Direct communication with hosts before confirming</li>
                 <li>
