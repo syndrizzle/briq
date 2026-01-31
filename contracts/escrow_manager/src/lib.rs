@@ -496,7 +496,7 @@ impl EscrowManager {
             .unwrap_or_else(|| panic_with_error!(env, Error::Unauthorized))
     }
 
-    fn agreement_client(env: &Env) -> RentalAgreementClient {
+    fn agreement_client(env: &Env) -> RentalAgreementClient<'_> {
         let addr: Address = env
             .storage()
             .instance()
@@ -509,7 +509,7 @@ impl EscrowManager {
         Self::agreement_client(env).get_agreement(&agreement_id)
     }
 
-    fn xlm_client(env: &Env) -> token::Client {
+    fn xlm_client(env: &Env) -> token::Client<'_> {
         let token_addr: Address = env
             .storage()
             .instance()

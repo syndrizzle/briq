@@ -96,7 +96,7 @@ pub struct Review {
     pub reviewer: Address,
     pub reviewee: Address,
     pub reviewer_type: ReviewerType,
-    pub rating: u8,
+    pub rating: u32,
     pub review_text: String,
     pub created_at: u64,
 }
@@ -211,7 +211,7 @@ impl ReviewSystem {
         env: Env,
         reviewer: Address,
         agreement_id: BytesN<32>,
-        rating: u8,
+        rating: u32,
         review_text: String,
     ) -> BytesN<32> {
         Self::check_not_paused(&env);
