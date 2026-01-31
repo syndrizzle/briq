@@ -8,8 +8,8 @@ export default async function AppPage() {
   });
 
   // TODO: Check if user has connected wallet, if not redirect to onboarding
-  // For now, always redirect to onboarding
-  redirect("/app/onboarding");
+  // For now, redirect to dashboard
+  redirect("/app/dashboard");
 
   return null;
 }
