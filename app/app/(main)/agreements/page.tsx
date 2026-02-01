@@ -243,6 +243,14 @@ export default function AgreementsPage() {
       a.status === AgreementStatus.Rejected,
   );
 
+  // Determine the default tab (first one with data)
+  const getDefaultTab = () => {
+    if (pendingAgreements.length > 0) return "pending";
+    if (activeAgreements.length > 0) return "active";
+    if (pastAgreements.length > 0) return "past";
+    return "pending";
+  };
+
   if (!user?.walletAddress) {
     return (
       <div className="space-y-6">
@@ -341,7 +349,7 @@ export default function AgreementsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="pending" className="space-y-4">
+        <Tabs defaultValue={getDefaultTab()} className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="pending" className="relative">
               Pending

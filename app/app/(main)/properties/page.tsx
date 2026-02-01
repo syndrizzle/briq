@@ -33,6 +33,7 @@ interface ExtendedUser {
 interface DisplayProperty {
   id: string;
   title: string;
+  description?: string;
   location: string;
   pricePerMonth: number; // XLM
   securityDeposit: number;
@@ -71,6 +72,7 @@ export default function PropertiesPage() {
         const displayProperties: DisplayProperty[] = rawProperties.map((p) => ({
           id: p.id,
           title: p.title,
+          description: p.description || undefined,
           location: p.location,
           pricePerMonth: Number(p.pricePerMonth) / STROOPS_PER_XLM,
           securityDeposit: Number(p.securityDeposit) / STROOPS_PER_XLM,

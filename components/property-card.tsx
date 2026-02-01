@@ -9,6 +9,7 @@ import { HouseIcon, MapPinIcon, ArrowRightIcon } from "@phosphor-icons/react";
 export interface PropertyCardData {
   id: string;
   title: string;
+  description?: string;
   location: string;
   pricePerMonth: number; // In XLM
   isAvailable: boolean;
@@ -53,10 +54,15 @@ export function PropertyCard({
         </Badge>
       </div>
 
-      <CardHeader>
-        <CardTitle className="line-clamp-1">{property.title}</CardTitle>
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <MapPinIcon className="size-4" />
+      <CardHeader className="pb-2">
+        <CardTitle className="line-clamp-1 text-lg">{property.title}</CardTitle>
+        {property.description && (
+          <p className="line-clamp-2 text-sm text-muted-foreground">
+            {property.description}
+          </p>
+        )}
+        <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
+          <MapPinIcon className="size-4 shrink-0" />
           <span className="line-clamp-1">{property.location}</span>
         </div>
       </CardHeader>
@@ -73,7 +79,7 @@ export function PropertyCard({
 
         <Link href={propertyLink}>
           <Button variant="ghost" size="sm">
-            {isLandlord ? "Manage" : "View"}
+            View
             <ArrowRightIcon className="size-4" />
           </Button>
         </Link>

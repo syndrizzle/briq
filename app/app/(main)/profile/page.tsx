@@ -4,15 +4,8 @@ import { useState, useEffect } from "react";
 import { useSession } from "@/lib/auth-client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   UserIcon,
   WalletIcon,
@@ -24,10 +17,12 @@ import {
   CopyIcon,
   ArrowsClockwiseIcon,
   WarningIcon,
+  EnvelopeIcon,
+  IdentificationCardIcon,
+  ShieldCheckIcon,
 } from "@phosphor-icons/react";
 import {
   isConnected,
-  getAddress,
   getNetworkDetails,
   requestAccess,
 } from "@stellar/freighter-api";
@@ -44,6 +39,12 @@ interface ExtendedUser {
 }
 
 const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
+
+// Shorten wallet address for display
+function shortenAddress(address: string): string {
+  if (address.length <= 16) return address;
+  return `${address.slice(0, 8)}...${address.slice(-6)}`;
+}
 
 export default function ProfilePage() {
   const { data: session } = useSession();
@@ -168,58 +169,66 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold">Profile</h1>
+        <h1 className="text-2xl font-bold">Profile</h1>
         <p className="text-muted-foreground">
           Manage your account settings and preferences
         </p>
       </div>
 
-      {/* User Info Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <Avatar size="lg">
+      {/* Profile Hero Card */}
+      <Card className="overflow-hidden py-0">
+        <div className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-6">
+          <div className="flex flex-col items-center gap-4 sm:flex-row">
+            <Avatar className="size-20 border-4 border-background shadow-lg">
               {user?.image && (
                 <AvatarImage src={user.image} alt={user?.name || "User"} />
               )}
-              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-primary/10 text-2xl font-semibold text-primary">
+                {initials}
+              </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              <CardTitle className="text-xl">{user?.name || "User"}</CardTitle>
-              <CardDescription>{user?.email}</CardDescription>
+            <div className="flex-1 text-center sm:text-left">
+              <h2 className="text-xl font-semibold">{user?.name || "User"}</h2>
+              <p className="text-muted-foreground">{user?.email}</p>
+              <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <Badge
+                  variant={userType === "landlord" ? "default" : "secondary"}
+                >
+                  {userType === "landlord" ? (
+                    <>
+                      <HouseIcon className="mr-1 size-3" weight="fill" />
+                      Landlord
+                    </>
+                  ) : (
+                    <>
+                      <UsersIcon className="mr-1 size-3" weight="fill" />
+                      Tenant
+                    </>
+                  )}
+                </Badge>
+                {walletAddress && (
+                  <Badge variant="outline" className="border-primary/50">
+                    <WalletIcon className="mr-1 size-3" />
+                    Connected
+                  </Badge>
+                )}
+              </div>
             </div>
-            <Badge
-              variant={userType === "landlord" ? "default" : "secondary"}
-              className="text-sm"
-            >
-              {userType === "landlord" ? (
-                <>
-                  <HouseIcon className="size-3" />
-                  Landlord
-                </>
-              ) : (
-                <>
-                  <UsersIcon className="size-3" />
-                  Tenant
-                </>
-              )}
-            </Badge>
           </div>
-        </CardHeader>
+        </div>
       </Card>
 
-      {/* User Type Switcher */}
+      {/* Mode Switcher */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <ArrowsClockwiseIcon className="size-5" />
-            Mode
+            <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+              <ArrowsClockwiseIcon className="size-4 text-primary" />
+            </div>
+            Switch Mode
           </CardTitle>
-          <CardDescription>
-            Switch between landlord and tenant mode
-          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex rounded-lg bg-muted p-1">
             <button
               onClick={() => switchUserType("landlord")}
@@ -260,7 +269,7 @@ export default function ProfilePage() {
               Tenant
             </button>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {userType === "landlord"
               ? "As a landlord, you can list properties and receive rent payments."
               : "As a tenant, you can browse properties and make rental agreements."}
@@ -270,30 +279,29 @@ export default function ProfilePage() {
 
       {/* Wallet Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <WalletIcon className="size-5" />
+            <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+              <WalletIcon className="size-4 text-primary" />
+            </div>
             Stellar Wallet
           </CardTitle>
-          <CardDescription>
-            Your connected wallet for blockchain transactions
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {walletAddress ? (
             <>
               {/* Connected Wallet Display */}
-              <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-4">
-                <div className="flex size-10 items-center justify-center rounded-full bg-green-500/10">
+              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
                   <CheckCircleIcon
-                    className="size-5 text-green-500"
+                    className="size-5 text-primary"
                     weight="fill"
                   />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">Wallet Connected</p>
-                  <p className="truncate font-mono text-xs text-muted-foreground">
-                    {walletAddress}
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {shortenAddress(walletAddress)}
                   </p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={copyWalletAddress}>
@@ -301,49 +309,33 @@ export default function ProfilePage() {
                 </Button>
               </div>
 
-              {/* Network Badge */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Network</span>
-                <Badge
-                  variant="outline"
-                  className="border-green-500 text-green-500"
-                >
-                  Stellar Testnet
-                </Badge>
-              </div>
-
-              <Separator />
-
               {/* Relink Option */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Link Different Wallet</p>
-                  <p className="text-xs text-muted-foreground">
-                    Connect a new Stellar wallet
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={linkWallet}
-                  disabled={isLinking}
-                >
-                  {isLinking ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={linkWallet}
+                disabled={isLinking}
+              >
+                {isLinking ? (
+                  <>
                     <SpinnerIcon className="size-4 animate-spin" />
-                  ) : (
+                    Connecting...
+                  </>
+                ) : (
+                  <>
                     <LinkIcon className="size-4" />
-                  )}
-                  Relink
-                </Button>
-              </div>
+                    Link Different Wallet
+                  </>
+                )}
+              </Button>
             </>
           ) : (
             <>
               {/* No Wallet Connected */}
-              <div className="flex items-center gap-3 rounded-lg border border-dashed bg-muted/30 p-4">
-                <div className="flex size-10 items-center justify-center rounded-full bg-yellow-500/10">
+              <div className="flex items-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 p-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
                   <WarningIcon
-                    className="size-5 text-yellow-500"
+                    className="size-5 text-muted-foreground"
                     weight="fill"
                   />
                 </div>
@@ -356,17 +348,17 @@ export default function ProfilePage() {
               </div>
 
               {!isFreighterConnected && (
-                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm dark:border-yellow-900 dark:bg-yellow-950">
-                  <p className="text-yellow-800 dark:text-yellow-200">
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+                  <p className="text-muted-foreground">
                     Freighter wallet extension not detected.
                   </p>
                   <a
                     href="https://freighter.app"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-block text-xs underline"
+                    className="mt-1 inline-block text-xs text-primary underline"
                   >
-                    Install Freighter
+                    Install Freighter →
                   </a>
                 </div>
               )}
@@ -393,29 +385,34 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Account Info */}
+      {/* Account Details */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <UserIcon className="size-5" />
+            <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+              <UserIcon className="size-4 text-primary" />
+            </div>
             Account Details
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm text-muted-foreground">Name</span>
+        <CardContent className="space-y-1">
+          <div className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50">
+            <UserIcon className="size-4 text-muted-foreground" />
+            <span className="flex-1 text-sm text-muted-foreground">Name</span>
             <span className="text-sm font-medium">{user?.name || "-"}</span>
           </div>
-          <Separator />
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm text-muted-foreground">Email</span>
+          <div className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50">
+            <EnvelopeIcon className="size-4 text-muted-foreground" />
+            <span className="flex-1 text-sm text-muted-foreground">Email</span>
             <span className="text-sm font-medium">{user?.email || "-"}</span>
           </div>
-          <Separator />
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm text-muted-foreground">User ID</span>
+          <div className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50">
+            <IdentificationCardIcon className="size-4 text-muted-foreground" />
+            <span className="flex-1 text-sm text-muted-foreground">
+              User ID
+            </span>
             <span className="font-mono text-xs text-muted-foreground">
-              {user?.id || "-"}
+              {user?.id ? `${user.id.slice(0, 8)}...` : "-"}
             </span>
           </div>
         </CardContent>

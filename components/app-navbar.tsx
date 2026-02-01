@@ -20,6 +20,7 @@ import {
   SignOutIcon,
   UserIcon,
   GearIcon,
+  StarIcon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const navTabs = [
   { href: "/app/properties", label: "Properties", icon: MagnifyingGlassIcon },
   { href: "/app/agreements", label: "Agreements", icon: HandshakeIcon },
   { href: "/app/payments", label: "Payments", icon: CoinIcon },
+  { href: "/app/reviews", label: "Reviews", icon: StarIcon },
 ];
 
 export function AppNavbar() {
@@ -112,15 +114,6 @@ export function AppNavbar() {
               >
                 <UserIcon className="size-4" />
                 Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Link
-                href="/app/settings"
-                className="flex w-full items-center gap-2"
-              >
-                <GearIcon className="size-4" />
-                Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
