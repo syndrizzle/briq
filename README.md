@@ -1,6 +1,8 @@
-# Briq - Decentralized Rental Platform
+<img src="images/logo.png" alt="BRIQ Logo" height="60">
 
-![Briq Banner](public/background.webp)
+# Decentralized Rental Platform
+
+![Briq Banner](images/hero.png)
 
 Briq is a decentralized home rental platform built on the Stellar blockchain. It reimagines the rental experience by bringing trust, transparency, and efficiency to landlords and tenants through smart contracts.
 
@@ -54,25 +56,10 @@ Briq leverages a modern tech stack to deliver a Web2-like user experience with W
 
 ## 📸 Screenshots
 
-### Landing Page
-
-![Landing Page](https://via.placeholder.com/800x450?text=Landing+Page+Screenshot)
-_Modern, high-converting landing page with transparent navigation._
-
 ### Landlord Dashboard
 
-![Landlord Dashboard](https://via.placeholder.com/800x450?text=Landlord+Dashboard)
+![Landlord Dashboard](images/dashboard.png)
 _Manage properties, track earnings, and view requests._
-
-### Property Listings
-
-![Property Listings](https://via.placeholder.com/800x450?text=Property+Listings)
-_Browse available properties with rich details._
-
-### Rental & Escrow
-
-![Agreements](https://via.placeholder.com/800x450?text=Agreements+Interface)
-_Track active agreements and escrow status._
 
 ## 🔮 Future Scope & Plans
 
@@ -84,4 +71,4 @@ _Track active agreements and escrow status._
 
 ---
 
-Built with ❤️ by the Briq Team.
+Built with ❤️ by BitFlippers.
