@@ -296,7 +296,7 @@ export default function OnboardingPage() {
             </CardContent>
           </Card>
 
-          <Card className="group cursor-pointer overflow-hidden border-0 pt-0 transition-transform duration-300 hover:scale-[1.02]">
+          <Card className="group cursor-pointer overflow-hidden border-0 py-0 transition-transform duration-300 hover:scale-[1.02]">
             <div className="relative aspect-3/2 w-full">
               <Image
                 src="/types/tenant.webp"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ import {
   getAgreementsByLandlord,
   buildApproveRequestTx,
   buildRejectRequestTx,
+  buildDepositAndRentTx,
   submitTransaction,
   useWallet,
   networkConfig,
@@ -197,6 +199,34 @@ export default function AgreementsPage() {
     }
   };
 
+  // Handle payment (security deposit + first month rent)
+  const handlePayment = async (agreementId: string) => {
+    if (!publicKey) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    setProcessingId(agreementId);
+    try {
+      const tx = await buildDepositAndRentTx(publicKey, agreementId);
+      const signedXdr = await sign(tx.toXDR(), networkConfig.networkPassphrase);
+      await submitTransaction(signedXdr);
+
+      toast.success("Payment successful!", {
+        description: "Your rental agreement is now active.",
+      });
+
+      fetchAgreements();
+    } catch (err) {
+      console.error("Payment failed:", err);
+      toast.error("Payment failed", {
+        description: err instanceof Error ? err.message : "Please try again",
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   // Filter agreements by status category
   const pendingAgreements = agreements.filter(
     (a) => a.status === AgreementStatus.PendingLandlordApproval,
@@ -215,7 +245,7 @@ export default function AgreementsPage() {
 
   if (!user?.walletAddress) {
     return (
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="space-y-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <WarningCircleIcon className="size-12 text-muted-foreground" />
@@ -229,7 +259,7 @@ export default function AgreementsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">
@@ -247,15 +277,67 @@ export default function AgreementsPage() {
           <SpinnerIcon className="size-8 animate-spin text-muted-foreground" />
         </div>
       ) : agreements.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <HandshakeIcon className="size-12 text-muted-foreground" />
-            <p className="mt-4 text-lg font-medium">No agreements yet</p>
-            <p className="text-sm text-muted-foreground">
+        <Card className="overflow-hidden py-0">
+          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 text-center">
+            <div className="mx-auto mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10">
+              <HandshakeIcon
+                className="size-10 text-primary"
+                weight="duotone"
+              />
+            </div>
+            <h2 className="text-2xl font-semibold">
+              {isLandlord ? "No Rental Requests Yet" : "No Agreements Yet"}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
               {isLandlord
-                ? "You'll see rental requests here when tenants apply for your properties."
-                : "Browse properties and submit rental requests to get started."}
+                ? "When tenants apply to rent your properties, their requests will appear here for your review."
+                : "Start your journey by browsing available properties and submitting rental requests."}
             </p>
+          </div>
+
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-start justify-center gap-12">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <CheckCircleIcon
+                    className="size-5 text-primary"
+                    weight="fill"
+                  />
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {isLandlord ? "Easy Approvals" : "Quick Apply"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {isLandlord ? "One-click review" : "Simple request flow"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <CurrencyDollarIcon className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Secure Payments</p>
+                  <p className="text-sm text-muted-foreground">
+                    Stellar escrow
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <CalendarIcon className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Track Status</p>
+                  <p className="text-sm text-muted-foreground">
+                    Real-time updates
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -269,7 +351,20 @@ export default function AgreementsPage() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="active" className="relative">
+              Active
+              {activeAgreements.filter(
+                (a) => a.status === AgreementStatus.PendingPayment,
+              ).length > 0 && (
+                <span className="ml-2 inline-flex size-5 items-center justify-center rounded-full bg-amber-500 text-xs text-white">
+                  {
+                    activeAgreements.filter(
+                      (a) => a.status === AgreementStatus.PendingPayment,
+                    ).length
+                  }
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="past">Past</TabsTrigger>
           </TabsList>
 
@@ -285,6 +380,7 @@ export default function AgreementsPage() {
                   processingId={processingId}
                   onApprove={handleApprove}
                   onReject={handleReject}
+                  onPayment={handlePayment}
                 />
               ))
             )}
@@ -302,6 +398,7 @@ export default function AgreementsPage() {
                   processingId={processingId}
                   onApprove={handleApprove}
                   onReject={handleReject}
+                  onPayment={handlePayment}
                 />
               ))
             )}
@@ -319,6 +416,7 @@ export default function AgreementsPage() {
                   processingId={processingId}
                   onApprove={handleApprove}
                   onReject={handleReject}
+                  onPayment={handlePayment}
                 />
               ))
             )}
@@ -345,12 +443,14 @@ function AgreementCard({
   processingId,
   onApprove,
   onReject,
+  onPayment,
 }: {
   agreement: RentalAgreement;
   isLandlord: boolean;
   processingId: string | null;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onPayment: (id: string) => void;
 }) {
   const config =
     statusConfig[agreement.status] || statusConfig[AgreementStatus.Draft];
@@ -560,8 +660,16 @@ function AgreementCard({
                 </p>
               </div>
               {!isLandlord && (
-                <Button size="sm">
-                  <CurrencyDollarIcon className="size-4" />
+                <Button
+                  size="sm"
+                  onClick={() => onPayment(agreement.id)}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <SpinnerIcon className="size-4 animate-spin" />
+                  ) : (
+                    <CurrencyDollarIcon className="size-4" />
+                  )}
                   Pay Now
                 </Button>
               )}

@@ -133,7 +133,7 @@ export default function PropertyDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       {/* Back button & Header */}
       <div className="flex items-start justify-between">
         <div>

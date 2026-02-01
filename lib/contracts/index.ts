@@ -28,5 +28,16 @@ export {
   buildRejectRequestTx,
 } from "./rental-agreement";
 
+// Escrow Manager
+export type { EscrowAccount, PaymentRecord } from "./escrow-manager";
+export { PaymentType } from "./escrow-manager";
+export {
+  buildDepositAndRentTx,
+  buildPayRentTx,
+  buildReleaseDepositTx,
+  getEscrowAccount,
+  getPaymentHistory,
+} from "./escrow-manager";
+
 // Wallet hook (for client components)
 export { useWallet } from "./use-wallet";

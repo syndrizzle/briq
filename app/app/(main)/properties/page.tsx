@@ -106,8 +106,14 @@ export default function PropertiesPage() {
   // Empty state with creation prompt for landlords
   if (properties.length === 0 && userType === "landlord") {
     return (
-      <div className="mx-auto max-w-2xl py-12">
-        <Card className="overflow-hidden pt-0">
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">My Properties</h1>
+          <p className="text-muted-foreground">Manage your property listings</p>
+        </div>
+
+        <Card className="overflow-hidden py-0">
           <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 text-center">
             <div className="mx-auto mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10">
               <HouseIcon className="size-10 text-primary" weight="duotone" />
@@ -121,10 +127,10 @@ export default function PropertiesPage() {
           </div>
 
           <CardContent className="p-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex flex-wrap items-start justify-center gap-12">
               <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                  <SparkleIcon className="size-5 text-green-600 dark:text-green-400" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <SparkleIcon className="size-5 text-primary" />
                 </div>
                 <div>
                   <p className="font-medium">Secure Payments</p>
@@ -135,8 +141,8 @@ export default function PropertiesPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                  <UsersIcon className="size-5 text-blue-600 dark:text-blue-400" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <UsersIcon className="size-5 text-primary" />
                 </div>
                 <div>
                   <p className="font-medium">Verified Tenants</p>
@@ -147,8 +153,8 @@ export default function PropertiesPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
-                  <CurrencyDollarIcon className="size-5 text-purple-600 dark:text-purple-400" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <CurrencyDollarIcon className="size-5 text-primary" />
                 </div>
                 <div>
                   <p className="font-medium">Earn BRIQ</p>
@@ -174,13 +180,67 @@ export default function PropertiesPage() {
   // Empty state for tenants - browse properties
   if (properties.length === 0 && userType === "tenant") {
     return (
-      <div className="mx-auto max-w-2xl py-12 text-center">
-        <HouseIcon className="mx-auto size-16 text-muted-foreground/50" />
-        <h1 className="mt-6 text-2xl font-semibold">No Properties Available</h1>
-        <p className="mt-2 text-muted-foreground">
-          Check back soon for new listings, or switch to landlord mode to list
-          your property.
-        </p>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">Browse Properties</h1>
+          <p className="text-muted-foreground">Find your next home on Briq</p>
+        </div>
+
+        <Card className="overflow-hidden pt-0">
+          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 text-center">
+            <div className="mx-auto mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10">
+              <HouseIcon className="size-10 text-primary" weight="duotone" />
+            </div>
+            <h1 className="text-2xl font-semibold">
+              No Properties Available Yet
+            </h1>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+              We're building a community of quality rentals on the Stellar
+              blockchain. Check back soon for new listings!
+            </p>
+          </div>
+
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-start justify-center gap-12">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <SparkleIcon className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Secure Payments</p>
+                  <p className="text-sm text-muted-foreground">
+                    Protected via escrow
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <UsersIcon className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Verified Landlords</p>
+                  <p className="text-sm text-muted-foreground">
+                    Wallet-connected
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <CurrencyDollarIcon className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Earn BRIQ</p>
+                  <p className="text-sm text-muted-foreground">
+                    Rewards for renting
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

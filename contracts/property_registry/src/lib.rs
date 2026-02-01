@@ -48,6 +48,7 @@ pub enum DataKey {
     Property(BytesN<32>),
     PropertyList,
     OwnerIndex(Address),
+    RentalContract,
 }
 
 #[contract]
@@ -223,6 +224,40 @@ impl PropertyRegistry {
             panic_with_error!(&env, Error::Unauthorized);
         }
 
+        property.is_available = is_available;
+        property.updated_at = env.ledger().timestamp();
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Property(property_id.clone()), &property);
+
+        env.events().publish(
+            (Symbol::new(&env, "PropertyAvailabilityChanged"),),
+            (property_id, is_available),
+        );
+    }
+
+    pub fn set_rental_contract(env: Env, contract: Address) {
+        let admin = Self::require_admin(&env);
+        admin.require_auth();
+        env.storage()
+            .instance()
+            .set(&DataKey::RentalContract, &contract);
+    }
+
+    pub fn update_availability_by_contract(env: Env, property_id: BytesN<32>, is_available: bool) {
+        Self::check_not_paused(&env);
+
+        // Verify caller is the registered rental contract
+        let rental_contract: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::RentalContract)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::Unauthorized));
+        
+        rental_contract.require_auth();
+
+        let mut property = Self::get_property(env.clone(), property_id.clone());
         property.is_available = is_available;
         property.updated_at = env.ledger().timestamp();
 

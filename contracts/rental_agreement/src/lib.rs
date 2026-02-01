@@ -31,6 +31,7 @@ pub struct Property {
 #[contractclient(name = "PropertyRegistryClient")]
 pub trait PropertyRegistry {
     fn get_property(property_id: BytesN<32>) -> Property;
+    fn update_availability_by_contract(property_id: BytesN<32>, is_available: bool);
 }
 
 // -----------------------------
@@ -437,6 +438,17 @@ impl RentalAgreementContract {
             (Symbol::new(&env, "AgreementActivated"),),
             (agreement_id, agreement.deposit_paid_at),
         );
+
+        // Update property availability to false
+        let registry: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PropertyRegistry)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::Unauthorized));
+        
+        let client = PropertyRegistryClient::new(&env, &registry);
+        // This call will fail if the PropertyRegistry hasn't authorized this contract address
+        client.update_availability_by_contract(&agreement.property_id, &false);
     }
 
     // Called by escrow contract for each rent payment.
@@ -490,6 +502,16 @@ impl RentalAgreementContract {
             (Symbol::new(&env, "AgreementCompleted"),),
             (agreement_id, agreement.completed_at),
         );
+
+        // Make property available again
+        let registry: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PropertyRegistry)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::Unauthorized));
+        
+        let client = PropertyRegistryClient::new(&env, &registry);
+        client.update_availability_by_contract(&agreement.property_id, &true);
     }
 
     pub fn cancel_agreement(env: Env, caller: Address, agreement_id: BytesN<32>) {
@@ -519,6 +541,22 @@ impl RentalAgreementContract {
             (Symbol::new(&env, "AgreementCancelled"),),
             (agreement_id, env.ledger().timestamp()),
         );
+
+        // Make property available again (if it was unavailable - though likely it was already available if no payment made)
+        // But if we support cancellation after payment in future, this is needed.
+        // For now, cancellation only happens before payment, so property is arguably already available.
+        // BUT, if we want to support 'holding' status in future during pending, we might want this.
+        // Currently, property remains available during PendingLandlordApproval.
+        // So this is strictly not necessary for MVP logic but good practice.
+        /* 
+        let registry: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PropertyRegistry)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::Unauthorized));
+        let client = PropertyRegistryClient::new(&env, &registry);
+        client.update_availability_by_contract(&agreement.property_id, &true); 
+        */
     }
 
     pub fn get_agreement(env: Env, agreement_id: BytesN<32>) -> RentalAgreement {

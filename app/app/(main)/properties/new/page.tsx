@@ -245,7 +245,7 @@ export default function NewPropertyPage() {
   const progress = ((currentStep - 1) / (STEPS.length - 1)) * 100;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <Button
