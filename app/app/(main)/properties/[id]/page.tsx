@@ -25,6 +25,7 @@ import {
   HandshakeIcon,
 } from "@phosphor-icons/react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { RentalRequestDialog } from "@/components/rental-request-dialog";
 import { getProperty, type Property } from "@/lib/contracts";
 
 // Extended session type
@@ -332,16 +333,23 @@ export default function PropertyDetailPage() {
               <CardContent className="space-y-3">
                 {property.isAvailable ? (
                   <>
-                    <Button
-                      className="w-full"
-                      onClick={() => {
-                        // TODO: Create rental request via contract
-                        alert("Rental request coming soon");
-                      }}
+                    <RentalRequestDialog
+                      propertyId={property.id}
+                      propertyTitle={property.title}
+                      pricePerMonth={
+                        Number(property.pricePerMonth) / STROOPS_PER_XLM
+                      }
+                      securityDeposit={
+                        Number(property.securityDeposit) / STROOPS_PER_XLM
+                      }
+                      minStayDays={property.minStayDays}
+                      maxStayDays={property.maxStayDays}
                     >
-                      <HandshakeIcon className="size-4" />
-                      Request to Rent
-                    </Button>
+                      <Button className="w-full">
+                        <HandshakeIcon className="size-4" />
+                        Request to Rent
+                      </Button>
+                    </RentalRequestDialog>
                     <p className="text-center text-xs text-muted-foreground">
                       The landlord will review your request and contact you.
                     </p>

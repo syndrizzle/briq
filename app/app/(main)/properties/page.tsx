@@ -4,14 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { PropertyCard } from "@/components/property-card";
 import {
   HouseIcon,
   PlusIcon,
-  MapPinIcon,
   CurrencyDollarIcon,
-  ArrowRightIcon,
   SparkleIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
@@ -215,54 +213,11 @@ export default function PropertiesPage() {
       {/* Properties Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {properties.map((property) => (
-          <Card key={property.id} className="group overflow-hidden pt-0">
-            {/* Image - fixed 16:9 aspect ratio */}
-            <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-              {property.imageUrl ? (
-                <img
-                  src={property.imageUrl}
-                  alt={property.title}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center">
-                  <HouseIcon className="size-12 text-muted-foreground/30" />
-                </div>
-              )}
-              <Badge
-                className="absolute right-2 top-2"
-                variant={property.isAvailable ? "default" : "secondary"}
-              >
-                {property.isAvailable ? "Available" : "Rented"}
-              </Badge>
-            </div>
-
-            <CardHeader>
-              <CardTitle className="line-clamp-1">{property.title}</CardTitle>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPinIcon className="size-4" />
-                {property.location}
-              </div>
-            </CardHeader>
-
-            <CardContent className="flex items-center justify-between">
-              <div>
-                <p className="text-lg font-semibold">
-                  {property.pricePerMonth.toLocaleString()} XLM
-                  <span className="text-sm font-normal text-muted-foreground">
-                    /month
-                  </span>
-                </p>
-              </div>
-
-              <Link href={`/app/properties/${property.id}`}>
-                <Button variant="ghost" size="sm">
-                  View
-                  <ArrowRightIcon className="size-4" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <PropertyCard
+            key={property.id}
+            property={property}
+            isLandlord={userType === "landlord"}
+          />
         ))}
       </div>
     </div>

@@ -16,5 +16,17 @@ export {
   buildSetAvailabilityTx,
 } from "./property-registry";
 
+// Rental Agreement
+export type { RentalAgreement } from "./rental-agreement";
+export { AgreementStatus } from "./rental-agreement";
+export {
+  getAgreementsByTenant,
+  getAgreementsByLandlord,
+  getAgreement,
+  buildRequestRentalTx,
+  buildApproveRequestTx,
+  buildRejectRequestTx,
+} from "./rental-agreement";
+
 // Wallet hook (for client components)
 export { useWallet } from "./use-wallet";

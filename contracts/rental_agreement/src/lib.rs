@@ -54,11 +54,15 @@ pub enum Error {
     NotAgreementParty = 206,
     AlreadySigned = 207,
     InvalidState = 208,
+    RequestNotPending = 209,
+    RequestAlreadyRejected = 210,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AgreementStatus {
+    PendingLandlordApproval, // Tenant requested, awaiting landlord approval
+    Rejected,                 // Landlord rejected the request
     Draft,
     PendingTenantSign,
     PendingLandlordSign,
@@ -220,6 +224,139 @@ impl RentalAgreementContract {
         );
 
         id
+    }
+
+    /// Tenant-initiated rental request
+    /// Creates an agreement in PendingLandlordApproval status
+    pub fn request_rental(
+        env: Env,
+        tenant: Address,
+        agreement_id: BytesN<32>,
+        property_id: BytesN<32>,
+        start_date: u64,
+        end_date: u64,
+    ) -> BytesN<32> {
+        Self::check_not_paused(&env);
+
+        tenant.require_auth();
+
+        let property = Self::fetch_property(&env, property_id.clone());
+        if !property.is_active {
+            panic_with_error!(&env, Error::PropertyNotFoundOrInactive);
+        }
+        if !property.is_available {
+            panic_with_error!(&env, Error::PropertyNotAvailable);
+        }
+
+        Self::validate_dates_and_duration(
+            &env,
+            start_date,
+            end_date,
+            property.min_stay_days,
+            property.max_stay_days,
+        );
+
+        let now = env.ledger().timestamp();
+        let id = agreement_id;
+        let agreement = RentalAgreement {
+            id: id.clone(),
+            property_id: property_id.clone(),
+            landlord: property.owner.clone(),
+            tenant: tenant.clone(),
+            monthly_rent: property.price_per_month,
+            security_deposit: property.security_deposit,
+            start_date,
+            end_date,
+            status: AgreementStatus::PendingLandlordApproval,
+            landlord_signed: false,
+            landlord_signed_at: 0,
+            tenant_signed: true, // Tenant already agrees by requesting
+            tenant_signed_at: now,
+            deposit_paid: false,
+            deposit_paid_at: 0,
+            total_rent_paid: 0,
+            months_paid: 0,
+            created_at: now,
+            completed_at: 0,
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Agreement(id.clone()), &agreement);
+
+        Self::index_agreement(&env, &agreement);
+
+        env.events().publish(
+            (Symbol::new(&env, "RentalRequested"),),
+            (
+                id.clone(),
+                property_id,
+                property.owner,
+                tenant,
+                start_date,
+                end_date,
+            ),
+        );
+
+        id
+    }
+
+    /// Landlord approves a rental request
+    pub fn approve_request(env: Env, landlord: Address, agreement_id: BytesN<32>) {
+        Self::check_not_paused(&env);
+
+        landlord.require_auth();
+
+        let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
+        
+        if landlord != agreement.landlord {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        if agreement.status != AgreementStatus::PendingLandlordApproval {
+            panic_with_error!(&env, Error::RequestNotPending);
+        }
+
+        // Approve = landlord signs
+        agreement.landlord_signed = true;
+        agreement.landlord_signed_at = env.ledger().timestamp();
+        // Since tenant already signed during request, move to PendingPayment
+        agreement.status = AgreementStatus::PendingPayment;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Agreement(agreement_id.clone()), &agreement);
+
+        env.events().publish(
+            (Symbol::new(&env, "RequestApproved"),),
+            (agreement_id, landlord, env.ledger().timestamp()),
+        );
+    }
+
+    /// Landlord rejects a rental request
+    pub fn reject_request(env: Env, landlord: Address, agreement_id: BytesN<32>) {
+        Self::check_not_paused(&env);
+
+        landlord.require_auth();
+
+        let mut agreement = Self::get_agreement(env.clone(), agreement_id.clone());
+        
+        if landlord != agreement.landlord {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        if agreement.status != AgreementStatus::PendingLandlordApproval {
+            panic_with_error!(&env, Error::RequestNotPending);
+        }
+
+        agreement.status = AgreementStatus::Rejected;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Agreement(agreement_id.clone()), &agreement);
+
+        env.events().publish(
+            (Symbol::new(&env, "RequestRejected"),),
+            (agreement_id, landlord, env.ledger().timestamp()),
+        );
     }
 
     pub fn tenant_sign(env: Env, tenant: Address, agreement_id: BytesN<32>) {

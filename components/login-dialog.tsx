@@ -1,30 +1,30 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { GoogleLogoIcon } from "@phosphor-icons/react"
-import { signIn } from "@/lib/auth-client"
-import { useState, ReactNode } from "react"
+} from "@/components/ui/dialog";
+import { GoogleLogoIcon } from "@phosphor-icons/react";
+import { signIn } from "@/lib/auth-client";
+import { useState, ReactNode } from "react";
 
 interface LoginDialogProps {
-  children: (props: { onClick: () => void }) => ReactNode
+  children: (props: { onClick: () => void }) => ReactNode;
 }
 
 export function LoginDialog({ children }: LoginDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
 
   const handleGoogleLogin = async () => {
     await signIn.social({
       provider: "google",
-      callbackURL: "/app",
-    })
-  }
+      callbackURL: "/app/onboarding",
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -48,5 +48,5 @@ export function LoginDialog({ children }: LoginDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

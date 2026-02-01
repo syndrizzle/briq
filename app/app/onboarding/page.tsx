@@ -19,6 +19,16 @@ const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
 
 type OnboardingStep = "wallet" | "choose-side";
 
+// Extended user type to include custom fields
+interface ExtendedUser {
+  id: string;
+  name: string;
+  email: string;
+  image?: string;
+  walletAddress?: string;
+  userType?: "landlord" | "tenant";
+}
+
 export default function OnboardingPage() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
@@ -26,6 +36,18 @@ export default function OnboardingPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isFreighterInstalled, setIsFreighterInstalled] = useState(false);
+
+  const user = session?.user as ExtendedUser | undefined;
+
+  // Redirect to dashboard if onboarding already complete
+  useEffect(() => {
+    if (isPending) return;
+
+    // If user has both wallet and userType, they've completed onboarding
+    if (user?.walletAddress && user?.userType) {
+      router.replace("/app/dashboard");
+    }
+  }, [isPending, user, router]);
 
   useEffect(() => {
     checkFreighter();
