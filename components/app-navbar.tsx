@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -32,15 +33,22 @@ const navTabs = [
 export function AppNavbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  // Wait for hydration before rendering session-dependent content
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const user = session?.user;
-  const initials =
-    user?.name
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2) || "U";
+  const initials = mounted
+    ? user?.name
+        ?.split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "U"
+    : "U";
 
   const handleSignOut = async () => {
     await signOut();

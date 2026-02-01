@@ -109,6 +109,7 @@ export async function getPropertiesByOwner(
 
 /**
  * Build transaction to create a property (needs wallet signing)
+ * Returns both the transaction and the generated property ID
  */
 export async function buildCreatePropertyTx(
   ownerAddress: string,
@@ -122,9 +123,20 @@ export async function buildCreatePropertyTx(
     maxStayDays: number;
     imageUrl: string;
   },
-): Promise<StellarSdk.Transaction> {
+): Promise<{ transaction: StellarSdk.Transaction; propertyId: Uint8Array }> {
+  // Generate 32-byte random property ID client-side
+  const propertyId = new Uint8Array(32);
+  if (typeof window !== "undefined" && window.crypto) {
+    window.crypto.getRandomValues(propertyId);
+  } else {
+    // Node.js fallback
+    const crypto = await import("crypto");
+    crypto.randomFillSync(propertyId);
+  }
+
   const args = [
     new StellarSdk.Address(ownerAddress).toScVal(),
+    StellarSdk.nativeToScVal(Buffer.from(propertyId), { type: "bytes" }),
     StellarSdk.nativeToScVal(params.title, { type: "string" }),
     StellarSdk.nativeToScVal(params.description, { type: "string" }),
     StellarSdk.nativeToScVal(params.location, { type: "string" }),
@@ -135,12 +147,14 @@ export async function buildCreatePropertyTx(
     StellarSdk.nativeToScVal(params.imageUrl, { type: "string" }),
   ];
 
-  return buildContractCall(
+  const transaction = await buildContractCall(
     CONTRACT_IDS.PROPERTY_REGISTRY,
     "create_property",
     args,
     ownerAddress,
   );
+
+  return { transaction, propertyId };
 }
 
 /**

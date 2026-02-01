@@ -1,19 +1,21 @@
 import * as StellarSdk from "@stellar/stellar-sdk";
 
 // Network configuration from environment
-const NETWORK = process.env.STELLAR_NETWORK || "testnet";
+const NETWORK = process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet";
 const RPC_URL =
-  process.env.STELLAR_RPC_URL || "https://soroban-testnet.stellar.org";
+  process.env.NEXT_PUBLIC_STELLAR_RPC_URL ||
+  "https://soroban-testnet.stellar.org";
 const NETWORK_PASSPHRASE =
-  process.env.STELLAR_NETWORK_PASSPHRASE || StellarSdk.Networks.TESTNET;
+  process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE ||
+  StellarSdk.Networks.TESTNET;
 
 // Contract addresses from environment
 export const CONTRACT_IDS = {
-  BRIQ_TOKEN: process.env.BRIQ_TOKEN_CONTRACT!,
-  ESCROW_MANAGER: process.env.ESCROW_MANAGER_CONTRACT!,
-  RENT_AGREEMENT: process.env.RENT_AGREEMENT_CONTRACT!,
-  PROPERTY_REGISTRY: process.env.PROPERTY_REGISTRY_CONTRACT!,
-  REVIEW_AGREEMENT: process.env.REVIEW_AGREEMENT_CONTRACT!,
+  BRIQ_TOKEN: process.env.NEXT_PUBLIC_BRIQ_TOKEN_CONTRACT!,
+  ESCROW_MANAGER: process.env.NEXT_PUBLIC_ESCROW_MANAGER_CONTRACT!,
+  RENT_AGREEMENT: process.env.NEXT_PUBLIC_RENT_AGREEMENT_CONTRACT!,
+  PROPERTY_REGISTRY: process.env.NEXT_PUBLIC_PROPERTY_REGISTRY_CONTRACT!,
+  REVIEW_AGREEMENT: process.env.NEXT_PUBLIC_REVIEW_AGREEMENT_CONTRACT!,
 } as const;
 
 // Initialize Soroban RPC client

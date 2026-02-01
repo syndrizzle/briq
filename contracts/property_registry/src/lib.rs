@@ -94,6 +94,7 @@ impl PropertyRegistry {
     pub fn create_property(
         env: Env,
         owner: Address,
+        property_id: BytesN<32>,
         title: String,
         description: String,
         location: String,
@@ -117,7 +118,7 @@ impl PropertyRegistry {
             max_stay_days,
         );
 
-        let id = Self::new_id(&env);
+        let id = property_id;
         let now = env.ledger().timestamp();
 
         let property = Property {
@@ -396,6 +397,8 @@ mod tests {
         client.initialize(&admin);
 
         let owner = Address::generate(&env);
+        // Generate property ID for test
+        let property_id: BytesN<32> = env.prng().gen();
         let title = String::from_str(&env, "Cozy Apartment");
         let desc = String::from_str(&env, "A nice place to stay");
         let loc = String::from_str(&env, "NYC");
@@ -404,6 +407,7 @@ mod tests {
         env.mock_all_auths();
         let id = client.create_property(
             &owner,
+            &property_id,
             &title,
             &desc,
             &loc,
