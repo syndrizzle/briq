@@ -62,7 +62,9 @@ export function AppNavbar() {
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/app/dashboard" className="flex items-center">
-          <span className="text-xl font-bold tracking-tight">Briq</span>
+          <span className="font-embryo text-2xl font-bold tracking-wide">
+            BRIQ
+          </span>
         </Link>
 
         {/* Tabs */}

@@ -29,20 +29,28 @@ export function LoginDialog({ children }: LoginDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children({ onClick: () => setOpen(true) })}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Get Started</DialogTitle>
-          <DialogDescription>
-            Sign in with Google to start renting on Briq.
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader className="flex flex-col items-center gap-2 space-y-0 pt-4">
+          <div className="flex items-center justify-center">
+            <span className="font-embryo text-3xl font-bold tracking-wide text-primary">
+              BRIQ
+            </span>
+          </div>
+          <DialogTitle className="text-xl text-center">
+            Welcome to Briq
+          </DialogTitle>
+          <DialogDescription className="text-center">
+            Sign in to start renting on Briq.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3 py-4">
+        <div className="flex flex-col gap-4 py-4">
           <Button
             variant="outline"
-            className="w-full"
+            size="lg"
+            className="w-full h-12 gap-3 text-base font-medium shadow-sm transition-all hover:bg-muted hover:text-foreground hover:shadow-md hover:border-primary/20"
             onClick={handleGoogleLogin}
           >
-            <GoogleLogoIcon className="size-4" />
+            <GoogleLogoIcon className="size-5" />
             Continue with Google
           </Button>
         </div>
