@@ -27,4 +27,5 @@ export const auth = betterAuth({
       },
     },
   },
+  trustedOrigins: ["https://briq.drzl.dev", "http://localhost:3000"],
 });
