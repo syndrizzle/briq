@@ -24,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const navTabs = [
-  { href: "/app/dashboard", label: "Dashboard", icon: HouseIcon },
+  { href: "/app/dashboard", label: "Home", icon: HouseIcon },
   { href: "/app/properties", label: "Properties", icon: MagnifyingGlassIcon },
   { href: "/app/agreements", label: "Agreements", icon: HandshakeIcon },
   { href: "/app/payments", label: "Payments", icon: CoinIcon },
@@ -56,7 +56,7 @@ export function AppNavbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background">
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/app/dashboard" className="flex items-center">
@@ -75,7 +75,7 @@ export function AppNavbar() {
                 className={cn(
                   "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary/10 text-primary"
+                    ? "border border-primary/50 bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
